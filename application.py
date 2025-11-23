@@ -397,8 +397,11 @@ elif page == "📂 Upload Data":
                     st.dataframe(df.head())
 
                 # Validate columns
-                required_columns = ['Date', 'Product', 'Quantity']
-                if all(col in df.columns for col in required_columns):
+                # Normalize columns for case-insensitive matching
+                col_map = {str(col).lower().strip(): col for col in df.columns}
+                required_keys = ['date', 'product', 'quantity']
+                
+                if all(key in col_map for key in required_keys):
                     if st.button("💾 Save to Database", use_container_width=True):
                         conn = get_db_connection()
                         cursor = conn.cursor()
@@ -407,20 +410,34 @@ elif page == "📂 Upload Data":
                         status_text = st.empty()
                         
                         total_rows = len(df)
+                        
+                        # Get actual column names from the map
+                        date_col = col_map['date']
+                        prod_col = col_map['product']
+                        qty_col = col_map['quantity']
+                        price_col = col_map.get('price')
+                        rev_col = col_map.get('revenue')
+
                         for index, row in df.iterrows():
-                            date_str = pd.to_datetime(row['Date']).strftime('%Y-%m-%d')
-                            
-                            # Calculate Revenue if Price exists, otherwise use Revenue column, else 0
-                            quantity = row['Quantity']
-                            if 'Price' in row:
-                                revenue = quantity * row['Price']
-                            else:
-                                revenue = row.get('Revenue', 0.0)
-                            
-                            cursor.execute('''
-                                INSERT INTO sales (date, product_name, quantity, revenue)
-                                VALUES (?, ?, ?, ?)
-                            ''', (date_str, row['Product'], quantity, revenue))
+                            try:
+                                date_str = pd.to_datetime(row[date_col]).strftime('%Y-%m-%d')
+                                
+                                # Calculate Revenue
+                                quantity = row[qty_col]
+                                if price_col and pd.notna(row[price_col]):
+                                    revenue = quantity * row[price_col]
+                                elif rev_col and pd.notna(row[rev_col]):
+                                    revenue = row[rev_col]
+                                else:
+                                    revenue = 0.0
+                                
+                                cursor.execute('''
+                                    INSERT INTO sales (date, product_name, quantity, revenue)
+                                    VALUES (?, ?, ?, ?)
+                                ''', (date_str, row[prod_col], quantity, revenue))
+                            except Exception as e:
+                                st.warning(f"Skipping row {index}: {e}")
+                                continue
                             
                             if index % 10 == 0:
                                 progress = min(index / total_rows, 1.0)
@@ -434,6 +451,7 @@ elif page == "📂 Upload Data":
                         st.balloons()
                         st.success(f"✅ Successfully added {total_rows} records!")
                 else:
-                    st.error(f"❌ Missing columns. Required: {', '.join(required_columns)}")
+                    st.error(f"❌ Missing columns. Required: Date, Product, Quantity (case-insensitive)")
             except Exception as e:
                 st.error(f"Error: {e}")
+
