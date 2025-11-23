@@ -1,0 +1,32 @@
+Project Setup
+    Create project directory shop_demand_predictor
+    Create 
+requirements.txt
+    Planning
+    Create 
+task.md
+    Create 
+implementation_plan.md
+    Get user approval for the plan
+    Database Implementation
+    Design SQLite schema (Products, Sales)
+    Create database initialization script
+    Web Application Development (Streamlit)
+    Create main app skeleton (
+app.py
+)
+    Implement Excel file uploader
+    Implement data ingestion logic (Excel -> SQLite)
+    Analysis & Prediction Logic
+    Implement data fetching from DB
+    Create prediction model (Linear Regression/Moving Average)
+    Create visualization (Demand Graphs)
+    Add Smart Suggestion logic
+    Verification
+    Create sample Excel file for testing
+    Verify upload and prediction flow
+    UI Enhancement
+    Add custom CSS for modern look
+    Improve dashboard layout with cards
+    Enhance chart aesthetics
+    Add Dark Mode toggle
