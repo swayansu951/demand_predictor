@@ -18,15 +18,19 @@ st.set_page_config(
 )
 
 # Database Connection
-DB_NAME = "shop_data.db"
+PROJECTS_DIR = "projects"
+DEFAULT_DB = "shop_data.db"
 
-def get_db_connection():
-    conn = sqlite3.connect(DB_NAME)
+if not os.path.exists(PROJECTS_DIR):
+    os.makedirs(PROJECTS_DIR)
+
+def get_db_connection(db_path=DEFAULT_DB):
+    conn = sqlite3.connect(db_path)
     return conn
 
-def init_db():
+def init_db(db_path=DEFAULT_DB):
     """Ensure table exists even if init_db.py wasn't run"""
-    conn = get_db_connection()
+    conn = get_db_connection(db_path)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sales (
@@ -40,15 +44,37 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Initialize default DB
 init_db()
 
 # --- Sidebar ---
 st.sidebar.title("📈 ShopPulse")
 st.sidebar.markdown("---")
+
+# Project Selection
+st.sidebar.subheader("🗂️ Project")
+project_options = ["Default"] + [d for d in os.listdir(PROJECTS_DIR) if os.path.isdir(os.path.join(PROJECTS_DIR, d))]
+selected_project = st.sidebar.selectbox("Select Project", project_options)
+
+if selected_project == "Default":
+    current_db_path = DEFAULT_DB
+    current_upload_dir = "uploaded_files"
+else:
+    current_db_path = os.path.join(PROJECTS_DIR, selected_project, "data.db")
+    current_upload_dir = os.path.join(PROJECTS_DIR, selected_project, "uploads")
+
+# Ensure directories exist for the selected project (if not default)
+if selected_project != "Default":
+    if not os.path.exists(current_upload_dir):
+        os.makedirs(current_upload_dir)
+    # Initialize DB if it doesn't exist
+    init_db(current_db_path)
+
+st.sidebar.markdown("---")
 page = st.sidebar.radio("Navigation", ["📊 Dashboard", "🔮 Demand Prediction", "📂 Upload Data"])
 st.sidebar.markdown("---")
 dark_mode = st.sidebar.checkbox("🌙 Dark Mode")
-st.sidebar.info("💡 **Tip:** Upload new sales data regularly for better predictions.")
+st.sidebar.info(f"💡 **Project:** {selected_project}")
 
 # --- Custom CSS Styling ---
 if dark_mode:
@@ -201,7 +227,7 @@ if page == "📊 Dashboard":
     st.title("📊 Business Overview")
     st.markdown("Welcome back! Here's how your shop is performing.")
     
-    conn = get_db_connection()
+    conn = get_db_connection(current_db_path)
     df = pd.read_sql_query("SELECT * FROM sales", conn)
     conn.close()
     
@@ -264,7 +290,7 @@ elif page == "🔮 Demand Prediction":
     st.title("🔮 AI Demand Forecast")
     st.markdown("Predict future inventory needs using our smart algorithms.")
     
-    conn = get_db_connection()
+    conn = get_db_connection(current_db_path)
     df = pd.read_sql_query("SELECT * FROM sales", conn)
     conn.close()
     
@@ -390,11 +416,11 @@ elif page == "📂 Upload Data":
         with st.expander("🗑️ Manage Data"):
             # --- File Management ---
             st.subheader("📂 Saved Files")
-            save_dir = "uploaded_files"
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
             
-            files = os.listdir(save_dir)
+            if not os.path.exists(current_upload_dir):
+                os.makedirs(current_upload_dir)
+            
+            files = os.listdir(current_upload_dir)
             st.write(f"**Total Saved Files:** {len(files)}")
             
             #deleting old file 
@@ -403,7 +429,7 @@ elif page == "📂 Upload Data":
                     deleted_count = 0
                     for f in files:
                         try:
-                            os.remove(os.path.join(save_dir, f))
+                            os.remove(os.path.join(current_upload_dir, f))
                             deleted_count += 1
                         except Exception as e:
                             st.error(f"Error deleting {f}: {e}")
@@ -419,7 +445,7 @@ elif page == "📂 Upload Data":
             # --- Database Management ---
             st.subheader("🗄️ Database Records")
             
-            conn = get_db_connection()
+            conn = get_db_connection(current_db_path)
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM sales")
             count = cursor.fetchone()[0]
@@ -430,7 +456,7 @@ elif page == "📂 Upload Data":
             if count > 0:
                 if st.button("Clear All Database Records", type="primary"):
                     try:
-                        conn = get_db_connection()
+                        conn = get_db_connection(current_db_path)
                         cursor = conn.cursor()
                         cursor.execute("DELETE FROM sales")
                         conn.commit()
@@ -448,8 +474,8 @@ elif page == "📂 Upload Data":
             st.subheader("⚠️ Danger Zone")
             if st.button("🧨 Delete Database File (Hard Reset)", type="primary"):
                 try:
-                    if os.path.exists(DB_NAME):
-                        os.remove(DB_NAME)
+                    if os.path.exists(current_db_path):
+                        os.remove(current_db_path)
                         st.success("✅ Database file deleted successfully! App will reload...")
                         time.sleep(1)
                         st.rerun()
@@ -460,21 +486,46 @@ elif page == "📂 Upload Data":
 
         st.write("") # Spacer
         
+        # New Project Creation Option
+        new_project_name = st.text_input("🆕 Create New Project (Optional)", placeholder="Enter project name to create a new separate workspace")
+        
         uploaded_file = st.file_uploader("Drop your Excel file here", type=["xlsx", "xls"])
-
-
 
         if uploaded_file is not None:
             try:
+                # Determine target paths
+                if new_project_name.strip():
+                    # Sanitize project name
+                    safe_project_name = "".join([c for c in new_project_name if c.isalnum() or c in (' ', '_', '-')]).strip()
+                    if not safe_project_name:
+                        st.error("Invalid project name.")
+                        st.stop()
+                        
+                    target_project_dir = os.path.join(PROJECTS_DIR, safe_project_name)
+                    target_upload_dir = os.path.join(target_project_dir, "uploads")
+                    target_db_path = os.path.join(target_project_dir, "data.db")
+                    
+                    if not os.path.exists(target_upload_dir):
+                        os.makedirs(target_upload_dir)
+                    
+                    # Initialize DB for new project
+                    init_db(target_db_path)
+                    
+                    st.success(f"Creating new project: **{safe_project_name}**")
+                    active_upload_dir = target_upload_dir
+                    active_db_path = target_db_path
+                else:
+                    active_upload_dir = current_upload_dir
+                    active_db_path = current_db_path
+
                 # Save the file to disk
-                save_dir = "uploaded_files"
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
+                if not os.path.exists(active_upload_dir):
+                    os.makedirs(active_upload_dir)
                 
                 timestamp = int(time.time())
                 original_filename = uploaded_file.name
                 saved_filename = f"{timestamp}_{original_filename}"
-                file_path = os.path.join(save_dir, saved_filename)
+                file_path = os.path.join(active_upload_dir, saved_filename)
                 
                 with open(file_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
@@ -494,7 +545,7 @@ elif page == "📂 Upload Data":
                 
                 if all(key in col_map for key in required_keys):
                     if st.button("💾 Save to Database", use_container_width=True):
-                        conn = get_db_connection()
+                        conn = get_db_connection(active_db_path)
                         cursor = conn.cursor()
                         
                         progress_bar = st.progress(0)
