@@ -498,3 +498,4 @@ elif page == "📂 Upload Data":
                     st.error(f"❌ Missing columns. Required: Date, Product, Quantity (case-insensitive)")
             except Exception as e:
                 st.error(f"Error: {e}")
+
