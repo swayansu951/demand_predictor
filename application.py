@@ -386,8 +386,10 @@ elif page == "📂 Upload Data":
         </div>
         """, unsafe_allow_html=True)
         
-        # Manage Files Section
-        with st.expander("🗑️ Manage Saved Files"):
+        # Manage Data Section
+        with st.expander("🗑️ Manage Data"):
+            # --- File Management ---
+            st.subheader("📂 Saved Files")
             save_dir = "uploaded_files"
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
@@ -411,6 +413,50 @@ elif page == "📂 Upload Data":
                         st.rerun()
             else:
                 st.info("No files to clear.")
+
+            st.markdown("---")
+
+            # --- Database Management ---
+            st.subheader("🗄️ Database Records")
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM sales")
+            count = cursor.fetchone()[0]
+            conn.close()
+            
+            st.write(f"**Total Sales Records:** {count}")
+            
+            if count > 0:
+                if st.button("Clear All Database Records", type="primary"):
+                    try:
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        cursor.execute("DELETE FROM sales")
+                        conn.commit()
+                        conn.close()
+                        st.success("✅ All database records deleted successfully!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error clearing database: {e}")
+            else:
+                st.info("Database is empty.")
+
+            st.markdown("---")
+            
+            # --- Hard Reset ---
+            st.subheader("⚠️ Danger Zone")
+            if st.button("🧨 Delete Database File (Hard Reset)", type="primary"):
+                try:
+                    if os.path.exists(DB_NAME):
+                        os.remove(DB_NAME)
+                        st.success("✅ Database file deleted successfully! App will reload...")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.warning("Database file not found.")
+                except Exception as e:
+                    st.error(f"Error deleting database file: {e}")
 
         st.write("") # Spacer
         
