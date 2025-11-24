@@ -81,68 +81,91 @@ if dark_mode:
     # DARK MODE CSS
     st.markdown("""
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+
+        /* Global Font */
+        html, body, [class*="css"] {
+            font-family: 'Poppins', sans-serif;
+        }
+
         /* Main Background */
         .stApp {
             background-color: #0e1117;
+            background-image: linear-gradient(to bottom right, #0e1117, #161b22);
             color: #fafafa;
         }
         
         /* Sidebar */
         [data-testid="stSidebar"] {
-            background-color: #262730;
+            background-color: #1a1c24;
+            border-right: 1px solid #2d3436;
         }
         [data-testid="stSidebar"] * {
-            color: #fafafa !important;
+            color: #dfe6e9 !important;
         }
         
         /* Headers */
         h1, h2, h3 {
             color: #fafafa !important;
-            font-family: 'Helvetica Neue', sans-serif;
+            font-family: 'Poppins', sans-serif;
             font-weight: 700;
+            letter-spacing: -0.5px;
         }
         
-        /* Metrics Cards */
+        /* Metrics Cards - Glassmorphism */
         div[data-testid="metric-container"] {
-            background-color: #262730;
+            background: rgba(38, 39, 48, 0.7);
+            backdrop-filter: blur(10px);
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-left: 5px solid #3498db;
+            transition: transform 0.2s;
+        }
+        div[data-testid="metric-container"]:hover {
+            transform: translateY(-5px);
         }
         div[data-testid="metric-container"] label {
-            color: #fafafa !important;
+            color: #b2bec3 !important;
+            font-size: 0.9rem;
         }
         div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
             color: #fafafa !important;
+            font-weight: 700;
         }
         
         /* Buttons */
         .stButton>button {
-            background-color: #3498db;
+            background: linear-gradient(90deg, #3498db, #2980b9);
             color: white;
-            border-radius: 8px;
+            border-radius: 12px;
             border: none;
-            padding: 10px 24px;
+            padding: 12px 28px;
             font-weight: 600;
+            letter-spacing: 0.5px;
             transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
         }
         .stButton>button:hover {
-            background-color: #2980b9;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
         }
         
         /* Dataframes */
         .stDataFrame {
-            border-radius: 10px;
+            border-radius: 15px;
             overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 1px solid #2d3436;
         }
         
         /* Upload Box */
         .upload-box {
-            background-color: #262730 !important;
+            background: rgba(38, 39, 48, 0.7) !important;
+            backdrop-filter: blur(10px);
             color: #fafafa !important;
+            border: 1px dashed #444;
         }
         .upload-box h3, .upload-box p {
             color: #fafafa !important;
@@ -152,23 +175,27 @@ if dark_mode:
         div[row-widget="radio"] > div {
             flex-direction: row;
             align-items: stretch;
+            background-color: transparent;
         }
         div[row-widget="radio"] label {
             background-color: #262730;
             border: 1px solid #444;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 5px;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 8px;
             transition: all 0.3s;
             cursor: pointer;
+            font-weight: 500;
         }
         div[row-widget="radio"] label:hover {
             background-color: #34495e;
             border-color: #3498db;
+            transform: translateX(5px);
         }
         div[row-widget="radio"] label[data-baseweb="radio"] {
-            background-color: #3498db !important;
-            border-color: #3498db !important;
+            background: linear-gradient(90deg, #3498db, #2980b9) !important;
+            border-color: transparent !important;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
         }
         </style>
         """, unsafe_allow_html=True)
@@ -176,91 +203,120 @@ else:
     # LIGHT MODE CSS
     st.markdown("""
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+
+        /* Global Font */
+        html, body, [class*="css"] {
+            font-family: 'Poppins', sans-serif;
+        }
+
         /* Main Background */
         .stApp {
             background-color: #f8f9fa;
-            color: #000000;
+            background-image: linear-gradient(to bottom right, #f8f9fa, #e9ecef);
+            color: #2d3436;
         }
         
         /* Sidebar */
         [data-testid="stSidebar"] {
-            background-color: #2c3e50;
+            background-color: #ffffff;
+            border-right: 1px solid #e9ecef;
         }
         [data-testid="stSidebar"] * {
-            color: #ecf0f1 !important;
+            color: #2d3436 !important;
         }
         
         /* Headers */
         h1, h2, h3 {
-            color: #000000;
-            font-family: 'Helvetica Neue', sans-serif;
+            color: #2d3436;
+            font-family: 'Poppins', sans-serif;
             font-weight: 700;
+            letter-spacing: -0.5px;
         }
         
         /* Metrics Cards */
         div[data-testid="metric-container"] {
-            background-color: white;
+            background: white;
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
             border-left: 5px solid #3498db;
+            transition: transform 0.2s;
+        }
+        div[data-testid="metric-container"]:hover {
+            transform: translateY(-5px);
         }
         div[data-testid="metric-container"] label {
-            color: #000000 !important;
+            color: #636e72 !important;
+            font-size: 0.9rem;
         }
         div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
-            color: #000000 !important;
+            color: #2d3436 !important;
+            font-weight: 700;
         }
         div[data-testid="stMetricLabel"] {
-            color: #000000 !important;
+            color: #2d3436 !important;
         }
         
         /* Buttons */
         .stButton>button {
-            background-color: #3498db;
+            background: linear-gradient(90deg, #3498db, #2980b9);
             color: white;
-            border-radius: 8px;
+            border-radius: 12px;
             border: none;
-            padding: 10px 24px;
+            padding: 12px 28px;
             font-weight: 600;
+            letter-spacing: 0.5px;
             transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.2);
         }
         .stButton>button:hover {
-            background-color: #2980b9;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(52, 152, 219, 0.3);
         }
         
         /* Dataframes */
         .stDataFrame {
-            border-radius: 10px;
+            border-radius: 15px;
             overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            border: 1px solid #e9ecef;
         }
         
         /* Upload Box */
         .upload-box {
             background-color: white !important;
-            color: #000000 !important;
+            color: #2d3436 !important;
+            border: 1px dashed #bdc3c7;
         }
 
         /* Radio Buttons (Navigation) */
         div[row-widget="radio"] > div {
             flex-direction: row;
             align-items: stretch;
+            background-color: transparent;
         }
         div[row-widget="radio"] label {
-            background-color: #ecf0f1;
-            border: 1px solid #bdc3c7;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 5px;
+            background-color: #f1f2f6;
+            border: 1px solid #dfe6e9;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 8px;
             transition: all 0.3s;
             cursor: pointer;
             color: #2c3e50 !important;
+            font-weight: 500;
         }
         div[row-widget="radio"] label:hover {
             background-color: #dfe6e9;
             border-color: #3498db;
+            transform: translateX(5px);
+        }
+        div[row-widget="radio"] label[data-baseweb="radio"] {
+            background: linear-gradient(90deg, #3498db, #2980b9) !important;
+            border-color: transparent !important;
+            color: white !important;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.2);
         }
         </style>
         """, unsafe_allow_html=True)
