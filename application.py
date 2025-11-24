@@ -73,7 +73,7 @@ if selected_project != "Default":
 st.sidebar.markdown("---")
 page = st.sidebar.radio("Navigation", ["📊 Dashboard", "🔮 Demand Prediction", "📂 Upload Data"])
 st.sidebar.markdown("---")
-dark_mode = st.sidebar.checkbox("🌙 Dark Mode")
+dark_mode = st.sidebar.checkbox("🌙 Dark Mode", value=True)
 st.sidebar.info(f"💡 **Project:** {selected_project}")
 
 # --- Custom CSS Styling ---
