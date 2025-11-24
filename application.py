@@ -147,6 +147,29 @@ if dark_mode:
         .upload-box h3, .upload-box p {
             color: #fafafa !important;
         }
+
+        /* Radio Buttons (Navigation) */
+        div[row-widget="radio"] > div {
+            flex-direction: row;
+            align-items: stretch;
+        }
+        div[row-widget="radio"] label {
+            background-color: #262730;
+            border: 1px solid #444;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        div[row-widget="radio"] label:hover {
+            background-color: #34495e;
+            border-color: #3498db;
+        }
+        div[row-widget="radio"] label[data-baseweb="radio"] {
+            background-color: #3498db !important;
+            border-color: #3498db !important;
+        }
         </style>
         """, unsafe_allow_html=True)
 else:
@@ -218,6 +241,26 @@ else:
         .upload-box {
             background-color: white !important;
             color: #000000 !important;
+        }
+
+        /* Radio Buttons (Navigation) */
+        div[row-widget="radio"] > div {
+            flex-direction: row;
+            align-items: stretch;
+        }
+        div[row-widget="radio"] label {
+            background-color: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            transition: all 0.3s;
+            cursor: pointer;
+            color: #2c3e50 !important;
+        }
+        div[row-widget="radio"] label:hover {
+            background-color: #dfe6e9;
+            border-color: #3498db;
         }
         </style>
         """, unsafe_allow_html=True)
