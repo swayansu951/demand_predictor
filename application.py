@@ -6,6 +6,8 @@ import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression
 import numpy as np
 from datetime import datetime, timedelta
+import os
+import time
 
 # Page Config
 st.set_page_config(
@@ -384,12 +386,54 @@ elif page == "📂 Upload Data":
         </div>
         """, unsafe_allow_html=True)
         
+        # Manage Files Section
+        with st.expander("🗑️ Manage Saved Files"):
+            save_dir = "uploaded_files"
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            
+            files = os.listdir(save_dir)
+            st.write(f"**Total Saved Files:** {len(files)}")
+            
+            if len(files) > 0:
+                if st.button("Clear All Saved Files", type="primary"):
+                    deleted_count = 0
+                    for f in files:
+                        try:
+                            os.remove(os.path.join(save_dir, f))
+                            deleted_count += 1
+                        except Exception as e:
+                            st.error(f"Error deleting {f}: {e}")
+                    
+                    if deleted_count > 0:
+                        st.success(f"Deleted {deleted_count} files.")
+                        st.rerun()
+            else:
+                st.info("No files to clear.")
+
         st.write("") # Spacer
         
         uploaded_file = st.file_uploader("Drop your Excel file here", type=["xlsx", "xls"])
 
+
+
         if uploaded_file is not None:
             try:
+                # Save the file to disk
+                save_dir = "uploaded_files"
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
+                
+                timestamp = int(time.time())
+                original_filename = uploaded_file.name
+                saved_filename = f"{timestamp}_{original_filename}"
+                file_path = os.path.join(save_dir, saved_filename)
+                
+                with open(file_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                
+                st.success(f"File saved locally as: {saved_filename}")
+
                 df = pd.read_excel(uploaded_file)
                 st.success("File uploaded successfully!")
                 
@@ -397,8 +441,11 @@ elif page == "📂 Upload Data":
                     st.dataframe(df.head())
 
                 # Validate columns
-                required_columns = ['Date', 'Product', 'Quantity']
-                if all(col in df.columns for col in required_columns):
+                # Normalize columns for case-insensitive matching
+                col_map = {str(col).lower().strip(): col for col in df.columns}
+                required_keys = ['date', 'product', 'quantity']
+                
+                if all(key in col_map for key in required_keys):
                     if st.button("💾 Save to Database", use_container_width=True):
                         conn = get_db_connection()
                         cursor = conn.cursor()
@@ -407,20 +454,34 @@ elif page == "📂 Upload Data":
                         status_text = st.empty()
                         
                         total_rows = len(df)
+                        
+                        # Get actual column names from the map
+                        date_col = col_map['date']
+                        prod_col = col_map['product']
+                        qty_col = col_map['quantity']
+                        price_col = col_map.get('price')
+                        rev_col = col_map.get('revenue')
+
                         for index, row in df.iterrows():
-                            date_str = pd.to_datetime(row['Date']).strftime('%Y-%m-%d')
-                            
-                            # Calculate Revenue if Price exists, otherwise use Revenue column, else 0
-                            quantity = row['Quantity']
-                            if 'Price' in row:
-                                revenue = quantity * row['Price']
-                            else:
-                                revenue = row.get('Revenue', 0.0)
-                            
-                            cursor.execute('''
-                                INSERT INTO sales (date, product_name, quantity, revenue)
-                                VALUES (?, ?, ?, ?)
-                            ''', (date_str, row['Product'], quantity, revenue))
+                            try:
+                                date_str = pd.to_datetime(row[date_col]).strftime('%Y-%m-%d')
+                                
+                                # Calculate Revenue
+                                quantity = row[qty_col]
+                                if price_col and pd.notna(row[price_col]):
+                                    revenue = quantity * row[price_col]
+                                elif rev_col and pd.notna(row[rev_col]):
+                                    revenue = row[rev_col]
+                                else:
+                                    revenue = 0.0
+                                
+                                cursor.execute('''
+                                    INSERT INTO sales (date, product_name, quantity, revenue)
+                                    VALUES (?, ?, ?, ?)
+                                ''', (date_str, row[prod_col], quantity, revenue))
+                            except Exception as e:
+                                st.warning(f"Skipping row {index}: {e}")
+                                continue
                             
                             if index % 10 == 0:
                                 progress = min(index / total_rows, 1.0)
@@ -434,6 +495,6 @@ elif page == "📂 Upload Data":
                         st.balloons()
                         st.success(f"✅ Successfully added {total_rows} records!")
                 else:
-                    st.error(f"❌ Missing columns. Required: {', '.join(required_columns)}")
+                    st.error(f"❌ Missing columns. Required: Date, Product, Quantity (case-insensitive)")
             except Exception as e:
                 st.error(f"Error: {e}")
