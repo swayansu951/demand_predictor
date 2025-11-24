@@ -425,18 +425,41 @@ elif page == "📂 Upload Data":
             
             #deleting old file 
             if len(files) > 0:
-                if st.button("Clear All Saved Files", type="primary"):
-                    deleted_count = 0
-                    for f in files:
-                        try:
-                            os.remove(os.path.join(current_upload_dir, f))
-                            deleted_count += 1
-                        except Exception as e:
-                            st.error(f"Error deleting {f}: {e}")
-                    
-                    if deleted_count > 0:
-                        st.success(f"Deleted {deleted_count} files.")
-                        st.rerun()
+                files_to_delete = st.multiselect("Select files to delete", files)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🗑️ Delete Selected", type="primary", use_container_width=True):
+                        if files_to_delete:
+                            deleted_count = 0
+                            for f in files_to_delete:
+                                try:
+                                    os.remove(os.path.join(current_upload_dir, f))
+                                    deleted_count += 1
+                                except Exception as e:
+                                    st.error(f"Error deleting {f}: {e}")
+                            
+                            if deleted_count > 0:
+                                st.success(f"Deleted {deleted_count} files.")
+                                time.sleep(0.5)
+                                st.rerun()
+                        else:
+                            st.warning("Please select files to delete.")
+                            
+                with col2:
+                    if st.button("⚠️ Clear All Files", type="secondary", use_container_width=True):
+                        deleted_count = 0
+                        for f in files:
+                            try:
+                                os.remove(os.path.join(current_upload_dir, f))
+                                deleted_count += 1
+                            except Exception as e:
+                                st.error(f"Error deleting {f}: {e}")
+                        
+                        if deleted_count > 0:
+                            st.success(f"Deleted {deleted_count} files.")
+                            time.sleep(0.5)
+                            st.rerun()
             else:
                 st.info("No files to clear.")
 
@@ -531,6 +554,10 @@ elif page == "📂 Upload Data":
                     f.write(uploaded_file.getbuffer())
                 
                 st.success(f"File saved locally as: {saved_filename}")
+                
+                # Refresh to show the new file in the list
+                time.sleep(1)
+                st.rerun()
 
                 df = pd.read_excel(uploaded_file)
                 st.success("File uploaded successfully!")
