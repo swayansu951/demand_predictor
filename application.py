@@ -395,6 +395,7 @@ elif page == "📂 Upload Data":
             files = os.listdir(save_dir)
             st.write(f"**Total Saved Files:** {len(files)}")
             
+            #deleting old file 
             if len(files) > 0:
                 if st.button("Clear All Saved Files", type="primary"):
                     deleted_count = 0
@@ -498,4 +499,5 @@ elif page == "📂 Upload Data":
                     st.error(f"❌ Missing columns. Required: Date, Product, Quantity (case-insensitive)")
             except Exception as e:
                 st.error(f"Error: {e}")
+
 
