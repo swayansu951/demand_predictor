@@ -9,7 +9,14 @@ from datetime import datetime, timedelta
 import os
 import time
 
-# Page Config
+# --- Constants & Setup ---
+PROJECTS_DIR = "projects"
+DEFAULT_DB = "shop_data.db"
+
+if not os.path.exists(PROJECTS_DIR):
+    os.makedirs(PROJECTS_DIR)
+
+# --- Page Config ---
 st.set_page_config(
     page_title="ShopPulse | Demand Predictor",
     page_icon="📈",
@@ -17,16 +24,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Database Connection
-DB_NAME = "shop_data.db"
-
-def get_db_connection():
-    conn = sqlite3.connect(DB_NAME)
+# --- Database Functions ---
+def get_db_connection(db_path):
+    conn = sqlite3.connect(db_path)
     return conn
 
-def init_db():
-    """Ensure table exists even if init_db.py wasn't run"""
-    conn = get_db_connection()
+def init_db(db_path):
+    """Ensure table exists in the specified database"""
+    conn = get_db_connection(db_path)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sales (
@@ -40,86 +45,156 @@ def init_db():
     conn.commit()
     conn.close()
 
-init_db()
+# Initialize default DB
+init_db(DEFAULT_DB)
 
-# --- Sidebar ---
+# --- Sidebar & Project Selection ---
 st.sidebar.title("📈 ShopPulse")
+
+# Project Selection
+st.sidebar.subheader("🗂️ Workspace")
+projects = [d for d in os.listdir(PROJECTS_DIR) if os.path.isdir(os.path.join(PROJECTS_DIR, d))]
+project_options = ["Default Project"] + projects
+selected_project = st.sidebar.selectbox("Select Project", project_options)
+
+# Determine Paths based on selection
+if selected_project == "Default Project":
+    current_db_path = DEFAULT_DB
+    current_upload_dir = "uploaded_files"
+else:
+    project_path = os.path.join(PROJECTS_DIR, selected_project)
+    current_db_path = os.path.join(project_path, "data.db")
+    current_upload_dir = os.path.join(project_path, "uploads")
+
+# Ensure directories exist
+if not os.path.exists(current_upload_dir):
+    os.makedirs(current_upload_dir)
+# Ensure DB exists for selected project
+init_db(current_db_path)
+
 st.sidebar.markdown("---")
 page = st.sidebar.radio("Navigation", ["📊 Dashboard", "🔮 Demand Prediction", "📂 Upload Data"])
 st.sidebar.markdown("---")
-dark_mode = st.sidebar.checkbox("🌙 Dark Mode")
-st.sidebar.info("💡 **Tip:** Upload new sales data regularly for better predictions.")
+dark_mode = st.sidebar.checkbox("🌙 Dark Mode", value=True)
+st.sidebar.info(f"� **Active:** {selected_project}")
 
 # --- Custom CSS Styling ---
 if dark_mode:
     # DARK MODE CSS
     st.markdown("""
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        
         /* Main Background */
         .stApp {
             background-color: #0e1117;
+            background-image: linear-gradient(to bottom right, #0e1117, #161b22);
             color: #fafafa;
+            font-family: 'Poppins', sans-serif;
         }
         
         /* Sidebar */
         [data-testid="stSidebar"] {
-            background-color: #262730;
+            background-color: #1a1c24;
+            border-right: 1px solid #2d3436;
         }
         [data-testid="stSidebar"] * {
-            color: #fafafa !important;
+            color: #dfe6e9 !important;
         }
         
         /* Headers */
         h1, h2, h3 {
             color: #fafafa !important;
-            font-family: 'Helvetica Neue', sans-serif;
+            font-family: 'Poppins', sans-serif;
             font-weight: 700;
+            letter-spacing: -0.5px;
         }
         
         /* Metrics Cards */
         div[data-testid="metric-container"] {
-            background-color: #262730;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            border-left: 5px solid #3498db;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
+        }
+        div[data-testid="metric-container"]:hover {
+            transform: translateY(-5px);
+            border-color: #3498db;
         }
         div[data-testid="metric-container"] label {
-            color: #fafafa !important;
+            color: #b2bec3 !important;
+            font-size: 0.9rem;
         }
         div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
             color: #fafafa !important;
+            font-size: 1.8rem;
+            font-weight: 700;
         }
         
         /* Buttons */
         .stButton>button {
-            background-color: #3498db;
+            background: linear-gradient(90deg, #3498db, #2980b9);
             color: white;
-            border-radius: 8px;
+            border-radius: 10px;
             border: none;
-            padding: 10px 24px;
+            padding: 12px 28px;
             font-weight: 600;
+            letter-spacing: 0.5px;
             transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
         }
         .stButton>button:hover {
-            background-color: #2980b9;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.5);
         }
         
         /* Dataframes */
         .stDataFrame {
-            border-radius: 10px;
+            border-radius: 15px;
             overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 1px solid #2d3436;
         }
         
         /* Upload Box */
         .upload-box {
-            background-color: #262730 !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+            backdrop-filter: blur(10px);
             color: #fafafa !important;
+            border: 1px dashed #3498db;
         }
         .upload-box h3, .upload-box p {
             color: #fafafa !important;
+        }
+        
+        /* Radio Buttons (Navigation) */
+        div[row-widget="radio"] > div {
+            flex-direction: row;
+            align-items: stretch;
+            background-color: transparent;
+        }
+        div[row-widget="radio"] label {
+            background-color: #262730;
+            border: 1px solid #444;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            transition: all 0.3s;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        div[row-widget="radio"] label:hover {
+            background-color: #34495e;
+            border-color: #3498db;
+            transform: translateX(5px);
+        }
+        div[row-widget="radio"] label[data-baseweb="radio"] {
+            background: linear-gradient(90deg, #3498db, #2980b9) !important;
+            border-color: transparent !important;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
         }
         </style>
         """, unsafe_allow_html=True)
@@ -127,71 +202,61 @@ else:
     # LIGHT MODE CSS
     st.markdown("""
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        
         /* Main Background */
         .stApp {
             background-color: #f8f9fa;
-            color: #000000;
+            color: #2d3436;
+            font-family: 'Poppins', sans-serif;
         }
         
         /* Sidebar */
         [data-testid="stSidebar"] {
-            background-color: #2c3e50;
+            background-color: #ffffff;
+            border-right: 1px solid #e0e0e0;
         }
         [data-testid="stSidebar"] * {
-            color: #ecf0f1 !important;
+            color: #2d3436 !important;
         }
         
         /* Headers */
         h1, h2, h3 {
-            color: #000000;
-            font-family: 'Helvetica Neue', sans-serif;
+            color: #2d3436 !important;
+            font-family: 'Poppins', sans-serif;
             font-weight: 700;
         }
         
         /* Metrics Cards */
         div[data-testid="metric-container"] {
-            background-color: white;
+            background: white;
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            border-left: 5px solid #3498db;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            border: 1px solid #f0f0f0;
+            transition: transform 0.3s ease;
         }
-        div[data-testid="metric-container"] label {
-            color: #000000 !important;
-        }
-        div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
-            color: #000000 !important;
-        }
-        div[data-testid="stMetricLabel"] {
-            color: #000000 !important;
+        div[data-testid="metric-container"]:hover {
+            transform: translateY(-5px);
+            border-color: #3498db;
         }
         
         /* Buttons */
         .stButton>button {
-            background-color: #3498db;
+            background: linear-gradient(90deg, #3498db, #2980b9);
             color: white;
-            border-radius: 8px;
-            border: none;
-            padding: 10px 24px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        .stButton>button:hover {
-            background-color: #2980b9;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        
-        /* Dataframes */
-        .stDataFrame {
             border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: none;
+            padding: 12px 28px;
+            font-weight: 600;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.2);
         }
         
         /* Upload Box */
         .upload-box {
-            background-color: white !important;
-            color: #000000 !important;
+            background: white !important;
+            color: #2d3436 !important;
+            border: 1px dashed #3498db;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -199,10 +264,13 @@ else:
 # --- Dashboard Page ---
 if page == "📊 Dashboard":
     st.title("📊 Business Overview")
-    st.markdown("Welcome back! Here's how your shop is performing.")
+    st.markdown(f"Overview for **{selected_project}**")
     
-    conn = get_db_connection()
-    df = pd.read_sql_query("SELECT * FROM sales", conn)
+    conn = get_db_connection(current_db_path)
+    try:
+        df = pd.read_sql_query("SELECT * FROM sales", conn)
+    except Exception:
+        df = pd.DataFrame()
     conn.close()
     
     if not df.empty:
@@ -262,10 +330,13 @@ if page == "📊 Dashboard":
 # --- Prediction Page ---
 elif page == "🔮 Demand Prediction":
     st.title("🔮 AI Demand Forecast")
-    st.markdown("Predict future inventory needs using our smart algorithms.")
+    st.markdown(f"Predictions for **{selected_project}**")
     
-    conn = get_db_connection()
-    df = pd.read_sql_query("SELECT * FROM sales", conn)
+    conn = get_db_connection(current_db_path)
+    try:
+        df = pd.read_sql_query("SELECT * FROM sales", conn)
+    except Exception:
+        df = pd.DataFrame()
     conn.close()
     
     if not df.empty:
@@ -390,27 +461,113 @@ elif page == "📂 Upload Data":
         with st.expander("🗑️ Manage Data"):
             # --- File Management ---
             st.subheader("📂 Saved Files")
-            save_dir = "uploaded_files"
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
             
-            files = os.listdir(save_dir)
+            files = os.listdir(current_upload_dir)
             st.write(f"**Total Saved Files:** {len(files)}")
             
-            #deleting old file 
+            # --- Load Saved File ---
             if len(files) > 0:
-                if st.button("Clear All Saved Files", type="primary"):
-                    deleted_count = 0
-                    for f in files:
-                        try:
-                            os.remove(os.path.join(save_dir, f))
-                            deleted_count += 1
-                        except Exception as e:
-                            st.error(f"Error deleting {f}: {e}")
+                st.markdown("### 📥 Load Saved File")
+                col_load1, col_load2 = st.columns([3, 1])
+                with col_load1:
+                    file_to_load = st.selectbox("Select a file to load into database", ["Select a file..."] + files)
+                
+                if file_to_load != "Select a file...":
+                    load_mode = st.radio("Load Mode", ["Append to Database", "Replace Database"], horizontal=True)
                     
-                    if deleted_count > 0:
-                        st.success(f"Deleted {deleted_count} files.")
-                        st.rerun()
+                    if st.button("🚀 Load Data", type="primary"):
+                        try:
+                            file_path = os.path.join(current_upload_dir, file_to_load)
+                            df_load = pd.read_excel(file_path)
+                            
+                            # Validate columns
+                            col_map = {str(col).lower().strip(): col for col in df_load.columns}
+                            required_keys = ['date', 'product', 'quantity']
+                            
+                            if all(key in col_map for key in required_keys):
+                                conn = get_db_connection(current_db_path)
+                                cursor = conn.cursor()
+                                
+                                if load_mode == "Replace Database":
+                                    cursor.execute("DELETE FROM sales")
+                                
+                                # Insert data
+                                date_col = col_map['date']
+                                prod_col = col_map['product']
+                                qty_col = col_map['quantity']
+                                price_col = col_map.get('price')
+                                rev_col = col_map.get('revenue')
+                                
+                                inserted_count = 0
+                                for index, row in df_load.iterrows():
+                                    try:
+                                        date_str = pd.to_datetime(row[date_col]).strftime('%Y-%m-%d')
+                                        quantity = row[qty_col]
+                                        if price_col and pd.notna(row[price_col]):
+                                            revenue = quantity * row[price_col]
+                                        elif rev_col and pd.notna(row[rev_col]):
+                                            revenue = row[rev_col]
+                                        else:
+                                            revenue = 0.0
+                                        
+                                        cursor.execute('''
+                                            INSERT INTO sales (date, product_name, quantity, revenue)
+                                            VALUES (?, ?, ?, ?)
+                                        ''', (date_str, row[prod_col], quantity, revenue))
+                                        inserted_count += 1
+                                    except Exception as e:
+                                        continue
+                                        
+                                conn.commit()
+                                conn.close()
+                                st.success(f"✅ Successfully loaded {inserted_count} records from {file_to_load}!")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("❌ File missing required columns (Date, Product, Quantity).")
+                        except Exception as e:
+                            st.error(f"Error loading file: {e}")
+            
+            st.markdown("---")
+            
+            # --- Delete Files ---
+            if len(files) > 0:
+                st.subheader("🗑️ Delete Files")
+                files_to_delete = st.multiselect("Select files to delete", files)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🗑️ Delete Selected", type="primary", use_container_width=True):
+                        if files_to_delete:
+                            deleted_count = 0
+                            for f in files_to_delete:
+                                try:
+                                    os.remove(os.path.join(current_upload_dir, f))
+                                    deleted_count += 1
+                                except Exception as e:
+                                    st.error(f"Error deleting {f}: {e}")
+                            
+                            if deleted_count > 0:
+                                st.success(f"Deleted {deleted_count} files.")
+                                time.sleep(0.5)
+                                st.rerun()
+                        else:
+                            st.warning("Please select files to delete.")
+                            
+                with col2:
+                    if st.button("⚠️ Clear All Files", type="secondary", use_container_width=True):
+                        deleted_count = 0
+                        for f in files:
+                            try:
+                                os.remove(os.path.join(current_upload_dir, f))
+                                deleted_count += 1
+                            except Exception as e:
+                                st.error(f"Error deleting {f}: {e}")
+                        
+                        if deleted_count > 0:
+                            st.success(f"Deleted {deleted_count} files.")
+                            time.sleep(0.5)
+                            st.rerun()
             else:
                 st.info("No files to clear.")
 
@@ -419,7 +576,7 @@ elif page == "📂 Upload Data":
             # --- Database Management ---
             st.subheader("🗄️ Database Records")
             
-            conn = get_db_connection()
+            conn = get_db_connection(current_db_path)
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM sales")
             count = cursor.fetchone()[0]
@@ -430,7 +587,7 @@ elif page == "📂 Upload Data":
             if count > 0:
                 if st.button("Clear All Database Records", type="primary"):
                     try:
-                        conn = get_db_connection()
+                        conn = get_db_connection(current_db_path)
                         cursor = conn.cursor()
                         cursor.execute("DELETE FROM sales")
                         conn.commit()
@@ -448,8 +605,8 @@ elif page == "📂 Upload Data":
             st.subheader("⚠️ Danger Zone")
             if st.button("🧨 Delete Database File (Hard Reset)", type="primary"):
                 try:
-                    if os.path.exists(DB_NAME):
-                        os.remove(DB_NAME)
+                    if os.path.exists(current_db_path):
+                        os.remove(current_db_path)
                         st.success("✅ Database file deleted successfully! App will reload...")
                         time.sleep(1)
                         st.rerun()
@@ -460,89 +617,60 @@ elif page == "📂 Upload Data":
 
         st.write("") # Spacer
         
+        # --- Upload Section ---
+        st.subheader("📤 Upload New Data")
+        
+        upload_destination = st.radio("Destination", ["Current Project", "New Project"], horizontal=True)
+        
+        new_project_name = ""
+        if upload_destination == "New Project":
+            new_project_name = st.text_input("Project Name", placeholder="Enter name for new workspace")
+        
         uploaded_file = st.file_uploader("Drop your Excel file here", type=["xlsx", "xls"])
-
-
 
         if uploaded_file is not None:
             try:
+                # Determine target paths
+                if upload_destination == "New Project" and new_project_name.strip():
+                    # Sanitize project name
+                    safe_project_name = "".join([c for c in new_project_name if c.isalnum() or c in (' ', '_', '-')]).strip()
+                    if not safe_project_name:
+                        st.error("Invalid project name.")
+                        st.stop()
+                        
+                    target_project_dir = os.path.join(PROJECTS_DIR, safe_project_name)
+                    target_upload_dir = os.path.join(target_project_dir, "uploads")
+                    target_db_path = os.path.join(target_project_dir, "data.db")
+                    
+                    if not os.path.exists(target_upload_dir):
+                        os.makedirs(target_upload_dir)
+                    
+                    # Initialize DB for new project
+                    init_db(target_db_path)
+                    
+                    st.success(f"Creating new project: **{safe_project_name}**")
+                    active_upload_dir = target_upload_dir
+                    active_db_path = target_db_path
+                else:
+                    active_upload_dir = current_upload_dir
+                    active_db_path = current_db_path
+
                 # Save the file to disk
-                save_dir = "uploaded_files"
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
+                if not os.path.exists(active_upload_dir):
+                    os.makedirs(active_upload_dir)
                 
                 timestamp = int(time.time())
                 original_filename = uploaded_file.name
                 saved_filename = f"{timestamp}_{original_filename}"
-                file_path = os.path.join(save_dir, saved_filename)
+                file_path = os.path.join(active_upload_dir, saved_filename)
                 
                 with open(file_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 
                 st.success(f"File saved locally as: {saved_filename}")
-
-                df = pd.read_excel(uploaded_file)
-                st.success("File uploaded successfully!")
                 
-                with st.expander("👀 Preview Data"):
-                    st.dataframe(df.head())
-
-                # Validate columns
-                # Normalize columns for case-insensitive matching
-                col_map = {str(col).lower().strip(): col for col in df.columns}
-                required_keys = ['date', 'product', 'quantity']
-                
-                if all(key in col_map for key in required_keys):
-                    if st.button("💾 Save to Database", use_container_width=True):
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        
-                        progress_bar = st.progress(0)
-                        status_text = st.empty()
-                        
-                        total_rows = len(df)
-                        
-                        # Get actual column names from the map
-                        date_col = col_map['date']
-                        prod_col = col_map['product']
-                        qty_col = col_map['quantity']
-                        price_col = col_map.get('price')
-                        rev_col = col_map.get('revenue')
-
-                        for index, row in df.iterrows():
-                            try:
-                                date_str = pd.to_datetime(row[date_col]).strftime('%Y-%m-%d')
-                                
-                                # Calculate Revenue
-                                quantity = row[qty_col]
-                                if price_col and pd.notna(row[price_col]):
-                                    revenue = quantity * row[price_col]
-                                elif rev_col and pd.notna(row[rev_col]):
-                                    revenue = row[rev_col]
-                                else:
-                                    revenue = 0.0
-                                
-                                cursor.execute('''
-                                    INSERT INTO sales (date, product_name, quantity, revenue)
-                                    VALUES (?, ?, ?, ?)
-                                ''', (date_str, row[prod_col], quantity, revenue))
-                            except Exception as e:
-                                st.warning(f"Skipping row {index}: {e}")
-                                continue
-                            
-                            if index % 10 == 0:
-                                progress = min(index / total_rows, 1.0)
-                                progress_bar.progress(progress)
-                                status_text.text(f"Processing row {index}/{total_rows}...")
-                                
-                        conn.commit()
-                        conn.close()
-                        progress_bar.progress(1.0)
-                        status_text.text("Done!")
-                        st.balloons()
-                        st.success(f"✅ Successfully added {total_rows} records!")
-                else:
-                    st.error(f"❌ Missing columns. Required: Date, Product, Quantity (case-insensitive)")
+                # Refresh to show the new file in the list
+                time.sleep(1)
+                st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
-
