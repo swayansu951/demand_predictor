@@ -207,7 +207,7 @@ else:
         /* Main Background */
         .stApp {
             background-color: #f8f9fa;
-            color: #2d3436;
+            color: #2d3436 !important;
             font-family: 'Poppins', sans-serif;
         }
         
@@ -674,5 +674,6 @@ elif page == "📂 Upload Data":
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
+
 
 
