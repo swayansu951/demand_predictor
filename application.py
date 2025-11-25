@@ -75,7 +75,7 @@ init_db(current_db_path)
 st.sidebar.markdown("---")
 page = st.sidebar.radio("Navigation", ["📊 Dashboard", "🔮 Demand Prediction", "📂 Upload Data"])
 st.sidebar.markdown("---")
-dark_mode = st.sidebar.checkbox("🌙 Dark Mode", value=True)
+# dark_mode = st.sidebar.checkbox("🌙 Dark Mode", value=True)
 st.sidebar.info(f"� **Active:** {selected_project}")
 
 # --- Custom CSS Styling ---
@@ -674,6 +674,7 @@ elif page == "📂 Upload Data":
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
+
 
 
 
