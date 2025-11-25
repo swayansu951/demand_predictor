@@ -10,11 +10,41 @@ import os
 import time
 
 # --- Constants & Setup ---
-PROJECTS_DIR = "projects"
-DEFAULT_DB = "shop_data.db"
+USERS_DIR = "users"
+DEFAULT_USER = "DefaultUser"
 
-if not os.path.exists(PROJECTS_DIR):
-    os.makedirs(PROJECTS_DIR)
+if not os.path.exists(USERS_DIR):
+    os.makedirs(USERS_DIR)
+
+# --- User Management Functions ---
+def get_users():
+    """Get list of existing users"""
+    if not os.path.exists(USERS_DIR):
+        return []
+    return [d for d in os.listdir(USERS_DIR) if os.path.isdir(os.path.join(USERS_DIR, d))]
+
+def create_user(username):
+    """Create a new user workspace with empty structure"""
+    user_dir = os.path.join(USERS_DIR, username)
+    if os.path.exists(user_dir):
+        return False
+    
+    # Create user directories
+    os.makedirs(user_dir)
+    os.makedirs(os.path.join(user_dir, "projects"))
+    os.makedirs(os.path.join(user_dir, "uploaded_files"))
+    
+    # Initialize empty database
+    user_db = os.path.join(user_dir, "data.db")
+    init_db(user_db)
+    
+    return True
+
+def init_user_workspace(username):
+    """Ensure user workspace exists with proper structure"""
+    user_dir = os.path.join(USERS_DIR, username)
+    if not os.path.exists(user_dir):
+        create_user(username)
 
 # --- Page Config ---
 st.set_page_config(
@@ -45,24 +75,78 @@ def init_db(db_path):
     conn.commit()
     conn.close()
 
-# Initialize default DB
-init_db(DEFAULT_DB)
-
-# --- Sidebar & Project Selection ---
+# --- Sidebar & User/Project Selection ---
 st.sidebar.title("📈 ShopPulse")
+
+# User Selection
+st.sidebar.subheader("👤 User")
+
+# Initialize session state for user
+if 'current_user' not in st.session_state:
+    users = get_users()
+    if not users:
+        # Create default user if none exist
+        create_user(DEFAULT_USER)
+        users = [DEFAULT_USER]
+    st.session_state.current_user = users[0]
+
+users = get_users()
+
+# User selection and creation UI
+col_user1, col_user2 = st.sidebar.columns([3, 1])
+with col_user1:
+    selected_user = st.selectbox("Select User", users, index=users.index(st.session_state.current_user) if st.session_state.current_user in users else 0, key="user_select")
+    if selected_user != st.session_state.current_user:
+        st.session_state.current_user = selected_user
+        st.rerun()
+
+with col_user2:
+    if st.button("➕", help="Create New User"):
+        st.session_state.show_new_user_dialog = True
+
+# New user creation dialog
+if st.session_state.get('show_new_user_dialog', False):
+    new_username = st.sidebar.text_input("New Username", placeholder="Enter username")
+    col_create1, col_create2 = st.sidebar.columns(2)
+    with col_create1:
+        if st.button("Create", type="primary", use_container_width=True):
+            if new_username.strip():
+                # Sanitize username
+                safe_username = "".join([c for c in new_username if c.isalnum() or c in ('_', '-')]).strip()
+                if safe_username and create_user(safe_username):
+                    st.session_state.current_user = safe_username
+                    st.session_state.show_new_user_dialog = False
+                    st.sidebar.success(f"User '{safe_username}' created!")
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    st.sidebar.error("User already exists or invalid name")
+            else:
+                st.sidebar.error("Please enter a username")
+    with col_create2:
+        if st.button("Cancel", use_container_width=True):
+            st.session_state.show_new_user_dialog = False
+            st.rerun()
+
+# Initialize current user workspace
+init_user_workspace(st.session_state.current_user)
+user_dir = os.path.join(USERS_DIR, st.session_state.current_user)
+
+st.sidebar.markdown("---")
 
 # Project Selection
 st.sidebar.subheader("🗂️ Workspace")
-projects = [d for d in os.listdir(PROJECTS_DIR) if os.path.isdir(os.path.join(PROJECTS_DIR, d))]
+user_projects_dir = os.path.join(user_dir, "projects")
+projects = [d for d in os.listdir(user_projects_dir) if os.path.isdir(os.path.join(user_projects_dir, d))]
 project_options = ["Default Project"] + projects
 selected_project = st.sidebar.selectbox("Select Project", project_options)
 
-# Determine Paths based on selection
+# Determine Paths based on selection (user-specific)
 if selected_project == "Default Project":
-    current_db_path = DEFAULT_DB
-    current_upload_dir = "uploaded_files"
+    current_db_path = os.path.join(user_dir, "data.db")
+    current_upload_dir = os.path.join(user_dir, "uploaded_files")
 else:
-    project_path = os.path.join(PROJECTS_DIR, selected_project)
+    project_path = os.path.join(user_projects_dir, selected_project)
     current_db_path = os.path.join(project_path, "data.db")
     current_upload_dir = os.path.join(project_path, "uploads")
 
@@ -76,7 +160,8 @@ st.sidebar.markdown("---")
 page = st.sidebar.radio("Navigation", ["📊 Dashboard", "🔮 Demand Prediction", "📂 Upload Data"])
 st.sidebar.markdown("---")
 # dark_mode = st.sidebar.checkbox("🌙 Dark Mode", value=True)
-st.sidebar.info(f"� **Active:** {selected_project}")
+st.sidebar.info(f"👤 **User:** {st.session_state.current_user}")
+st.sidebar.info(f"🎯 **Project:** {selected_project}")
 
 # --- Custom CSS Styling ---
 # if dark_mode:
@@ -207,7 +292,7 @@ st.markdown("""
 #         /* Main Background */
 #         .stApp {
 #             background-color: #f8f9fa;
-#             color: #2d3436 !important;
+#             color: #2d3436;
 #             font-family: 'Poppins', sans-serif;
 #         }
         
@@ -638,7 +723,8 @@ elif page == "📂 Upload Data":
                         st.error("Invalid project name.")
                         st.stop()
                         
-                    target_project_dir = os.path.join(PROJECTS_DIR, safe_project_name)
+                    # Create project in current user's projects directory
+                    target_project_dir = os.path.join(user_projects_dir, safe_project_name)
                     target_upload_dir = os.path.join(target_project_dir, "uploads")
                     target_db_path = os.path.join(target_project_dir, "data.db")
                     
@@ -674,12 +760,3 @@ elif page == "📂 Upload Data":
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
-
-
-
-
-
-
-
-
-
