@@ -294,8 +294,8 @@ if page == "📊 Dashboard":
         # Charts Row 1
         c1, c2 = st.columns(2)
         
-        chart_bgcolor = '#262730' if dark_mode else 'white'
-        font_color = '#fafafa' if dark_mode else '#000000'
+        chart_bgcolor = '#262730' #if dark_mode else 'white'
+        font_color = '#fafafa' #if dark_mode else '#000000'
         
         with c1:
             st.subheader("📈 Sales Trend")
@@ -674,6 +674,7 @@ elif page == "📂 Upload Data":
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
+
 
 
 
