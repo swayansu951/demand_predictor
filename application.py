@@ -389,8 +389,8 @@ elif page == "🔮 Demand Prediction":
                     combined_df = pd.concat([product_data[['date', 'quantity', 'type']], future_df])
                     
                     # Plot
-                    chart_bgcolor = '#262730' if dark_mode else 'white'
-                    font_color = '#fafafa' if dark_mode else '#2c3e50'
+                    chart_bgcolor = '#262730' #if dark_mode else 'white'
+                    font_color = '#fafafa' #if dark_mode else '#2c3e50'
 
                     fig_forecast = px.line(combined_df, x='date', y='quantity', color='type', 
                                          title=f'Demand Forecast: {selected_product}',
@@ -421,20 +421,20 @@ elif page == "🔮 Demand Prediction":
                     st.markdown("### 🤖 Suggestion")
                     if growth > 20:
                         suggestion = f"🚀 **High Demand Alert!** Sales for **{selected_product}** are expected to surge by {growth:.1f}%. Consider increasing your inventory orders immediately to avoid stockouts."
-                        box_color = "#d4edda" if not dark_mode else "#1e4620"
-                        text_color = "black" if not dark_mode else "#d4edda"
+                        box_color = "#d4edda" #if not dark_mode else "#1e4620"
+                        text_color = "black" #if not dark_mode else "#d4edda"
                     elif growth > 5:
                         suggestion = f"📈 **Steady Growth.** Demand is rising moderately ({growth:.1f}%). Maintain healthy stock levels and monitor closely."
-                        box_color = "#fff3cd" if not dark_mode else "#4d3e14"
-                        text_color = "black" if not dark_mode else "#fff3cd"
+                        box_color = "#fff3cd" #if not dark_mode else "#4d3e14"
+                        text_color = "black" #if not dark_mode else "#fff3cd"
                     elif growth > -5:
                         suggestion = f"⚖️ **Stable Demand.** Sales are expected to remain consistent. Standard restocking is recommended."
-                        box_color = "#d1ecf1" if not dark_mode else "#103f47"
-                        text_color = "black" if not dark_mode else "#d1ecf1"
+                        box_color = "#d1ecf1" #if not dark_mode else "#103f47"
+                        text_color = "black" #if not dark_mode else "#d1ecf1"
                     else:
                         suggestion = f"📉 **Declining Trend.** Demand is projected to drop by {abs(growth):.1f}%. Consider running a promotion or reducing future orders to prevent overstocking."
-                        box_color = "#f8d7da" if not dark_mode else "#4c1d21"
-                        text_color = "black" if not dark_mode else "#f8d7da"
+                        box_color = "#f8d7da" #if not dark_mode else "#4c1d21"
+                        text_color = "black" #if not dark_mode else "#f8d7da"
                         
                     st.markdown(f"""
                     <div style="background-color: {box_color}; color: {text_color}; padding: 15px; border-radius: 10px; border-left: 5px solid {text_color};">
@@ -674,6 +674,7 @@ elif page == "📂 Upload Data":
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
+
 
 
 
