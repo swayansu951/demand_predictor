@@ -75,191 +75,191 @@ init_db(current_db_path)
 st.sidebar.markdown("---")
 page = st.sidebar.radio("Navigation", ["📊 Dashboard", "🔮 Demand Prediction", "📂 Upload Data"])
 st.sidebar.markdown("---")
-dark_mode = st.sidebar.checkbox("🌙 Dark Mode", value=True)
+# dark_mode = st.sidebar.checkbox("🌙 Dark Mode", value=True)
 st.sidebar.info(f"� **Active:** {selected_project}")
 
 # --- Custom CSS Styling ---
-if dark_mode:
+# if dark_mode:
     # DARK MODE CSS
-    st.markdown("""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+    
+    /* Main Background */
+    .stApp {
+        background-color: #0e1117;
+        background-image: linear-gradient(to bottom right, #0e1117, #161b22);
+        color: #fafafa;
+        font-family: 'Poppins', sans-serif;
+    }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #1a1c24;
+        border-right: 1px solid #2d3436;
+    }
+    [data-testid="stSidebar"] * {
+        color: #dfe6e9 !important;
+    }
+    
+    /* Headers */
+    h1, h2, h3 {
+        color: #fafafa !important;
+        font-family: 'Poppins', sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+    }
+    
+    /* Metrics Cards */
+    div[data-testid="metric-container"] {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: transform 0.3s ease;
+    }
+    div[data-testid="metric-container"]:hover {
+        transform: translateY(-5px);
+        border-color: #3498db;
+    }
+    div[data-testid="metric-container"] label {
+        color: #b2bec3 !important;
+        font-size: 0.9rem;
+    }
+    div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
+        color: #fafafa !important;
+        font-size: 1.8rem;
+        font-weight: 700;
+    }
+    
+    /* Buttons */
+    .stButton>button {
+        background: linear-gradient(90deg, #3498db, #2980b9);
+        color: white;
+        border-radius: 10px;
+        border: none;
+        padding: 12px 28px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(52, 152, 219, 0.5);
+    }
+    
+    /* Dataframes */
+    .stDataFrame {
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        border: 1px solid #2d3436;
+    }
+    
+    /* Upload Box */
+    .upload-box {
+        background: rgba(255, 255, 255, 0.05) !important;
+        backdrop-filter: blur(10px);
+        color: #fafafa !important;
+        border: 1px dashed #3498db;
+    }
+    .upload-box h3, .upload-box p {
+        color: #fafafa !important;
+    }
+    
+    /* Radio Buttons (Navigation) */
+    div[row-widget="radio"] > div {
+        flex-direction: row;
+        align-items: stretch;
+        background-color: transparent;
+    }
+    div[row-widget="radio"] label {
+        background-color: #262730;
+        border: 1px solid #444;
+        padding: 12px;
+        border-radius: 12px;
+        margin-bottom: 8px;
+        transition: all 0.3s;
+        cursor: pointer;
+        font-weight: 500;
+    }
+    div[row-widget="radio"] label:hover {
+        background-color: #34495e;
+        border-color: #3498db;
+        transform: translateX(5px);
+    }
+    div[row-widget="radio"] label[data-baseweb="radio"] {
+        background: linear-gradient(90deg, #3498db, #2980b9) !important;
+        border-color: transparent !important;
+        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+# else:
+#     # LIGHT MODE CSS
+#     st.markdown("""
+#         <style>
+#         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
         
-        /* Main Background */
-        .stApp {
-            background-color: #0e1117;
-            background-image: linear-gradient(to bottom right, #0e1117, #161b22);
-            color: #fafafa;
-            font-family: 'Poppins', sans-serif;
-        }
+#         /* Main Background */
+#         .stApp {
+#             background-color: #f8f9fa;
+#             color: #2d3436 !important;
+#             font-family: 'Poppins', sans-serif;
+#         }
         
-        /* Sidebar */
-        [data-testid="stSidebar"] {
-            background-color: #1a1c24;
-            border-right: 1px solid #2d3436;
-        }
-        [data-testid="stSidebar"] * {
-            color: #dfe6e9 !important;
-        }
+#         /* Sidebar */
+#         [data-testid="stSidebar"] {
+#             background-color: #ffffff;
+#             border-right: 1px solid #e0e0e0;
+#         }
+#         [data-testid="stSidebar"] * {
+#             color: #2d3436 !important;
+#         }
         
-        /* Headers */
-        h1, h2, h3 {
-            color: #fafafa !important;
-            font-family: 'Poppins', sans-serif;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
+#         /* Headers */
+#         h1, h2, h3 {
+#             color: #2d3436 !important;
+#             font-family: 'Poppins', sans-serif;
+#             font-weight: 700;
+#         }
         
-        /* Metrics Cards */
-        div[data-testid="metric-container"] {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: transform 0.3s ease;
-        }
-        div[data-testid="metric-container"]:hover {
-            transform: translateY(-5px);
-            border-color: #3498db;
-        }
-        div[data-testid="metric-container"] label {
-            color: #b2bec3 !important;
-            font-size: 0.9rem;
-        }
-        div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
-            color: #fafafa !important;
-            font-size: 1.8rem;
-            font-weight: 700;
-        }
+#         /* Metrics Cards */
+#         div[data-testid="metric-container"] {
+#             background: white;
+#             padding: 20px;
+#             border-radius: 15px;
+#             box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+#             border: 1px solid #f0f0f0;
+#             transition: transform 0.3s ease;
+#         }
+#         div[data-testid="metric-container"]:hover {
+#             transform: translateY(-5px);
+#             border-color: #3498db;
+#         }
         
-        /* Buttons */
-        .stButton>button {
-            background: linear-gradient(90deg, #3498db, #2980b9);
-            color: white;
-            border-radius: 10px;
-            border: none;
-            padding: 12px 28px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
-        }
-        .stButton>button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.5);
-        }
+#         /* Buttons */
+#         .stButton>button {
+#             background: linear-gradient(90deg, #3498db, #2980b9);
+#             color: white;
+#             border-radius: 10px;
+#             border: none;
+#             padding: 12px 28px;
+#             font-weight: 600;
+#             box-shadow: 0 4px 10px rgba(52, 152, 219, 0.2);
+#         }
         
-        /* Dataframes */
-        .stDataFrame {
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            border: 1px solid #2d3436;
-        }
-        
-        /* Upload Box */
-        .upload-box {
-            background: rgba(255, 255, 255, 0.05) !important;
-            backdrop-filter: blur(10px);
-            color: #fafafa !important;
-            border: 1px dashed #3498db;
-        }
-        .upload-box h3, .upload-box p {
-            color: #fafafa !important;
-        }
-        
-        /* Radio Buttons (Navigation) */
-        div[row-widget="radio"] > div {
-            flex-direction: row;
-            align-items: stretch;
-            background-color: transparent;
-        }
-        div[row-widget="radio"] label {
-            background-color: #262730;
-            border: 1px solid #444;
-            padding: 12px;
-            border-radius: 12px;
-            margin-bottom: 8px;
-            transition: all 0.3s;
-            cursor: pointer;
-            font-weight: 500;
-        }
-        div[row-widget="radio"] label:hover {
-            background-color: #34495e;
-            border-color: #3498db;
-            transform: translateX(5px);
-        }
-        div[row-widget="radio"] label[data-baseweb="radio"] {
-            background: linear-gradient(90deg, #3498db, #2980b9) !important;
-            border-color: transparent !important;
-            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
-        }
-        </style>
-        """, unsafe_allow_html=True)
-else:
-    # LIGHT MODE CSS
-    st.markdown("""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
-        
-        /* Main Background */
-        .stApp {
-            background-color: #f8f9fa;
-            color: #2d3436 !important;
-            font-family: 'Poppins', sans-serif;
-        }
-        
-        /* Sidebar */
-        [data-testid="stSidebar"] {
-            background-color: #ffffff;
-            border-right: 1px solid #e0e0e0;
-        }
-        [data-testid="stSidebar"] * {
-            color: #2d3436 !important;
-        }
-        
-        /* Headers */
-        h1, h2, h3 {
-            color: #2d3436 !important;
-            font-family: 'Poppins', sans-serif;
-            font-weight: 700;
-        }
-        
-        /* Metrics Cards */
-        div[data-testid="metric-container"] {
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-            border: 1px solid #f0f0f0;
-            transition: transform 0.3s ease;
-        }
-        div[data-testid="metric-container"]:hover {
-            transform: translateY(-5px);
-            border-color: #3498db;
-        }
-        
-        /* Buttons */
-        .stButton>button {
-            background: linear-gradient(90deg, #3498db, #2980b9);
-            color: white;
-            border-radius: 10px;
-            border: none;
-            padding: 12px 28px;
-            font-weight: 600;
-            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.2);
-        }
-        
-        /* Upload Box */
-        .upload-box {
-            background: white !important;
-            color: #2d3436 !important;
-            border: 1px dashed #3498db;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+#         /* Upload Box */
+#         .upload-box {
+#             background: white !important;
+#             color: #2d3436 !important;
+#             border: 1px dashed #3498db;
+#         }
+#         </style>
+#         """, unsafe_allow_html=True)
 
 # --- Dashboard Page ---
 if page == "📊 Dashboard":
@@ -674,6 +674,7 @@ elif page == "📂 Upload Data":
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
+
 
 
 
