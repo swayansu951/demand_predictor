@@ -1,66 +1,59 @@
-import pandas as pd
-import numpy as np
+import os
+import time
 
-def test_logic(df):
-    # Normalize columns for case-insensitive matching
-    col_map = {str(col).lower().strip(): col for col in df.columns}
-    required_keys = ['date', 'product', 'quantity']
-    
-    if all(key in col_map for key in required_keys):
-        print("[OK] Required columns found!")
-        
-        # Get actual column names from the map
-        date_col = col_map['date']
-        prod_col = col_map['product']
-        qty_col = col_map['quantity']
-        price_col = col_map.get('price')
-        rev_col = col_map.get('revenue')
-        
-        print(f"Mapped columns: Date='{date_col}', Product='{prod_col}', Quantity='{qty_col}', Price='{price_col}', Revenue='{rev_col}'")
+# Mock environment
+UPLOAD_DIR = "test_uploads"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
 
-        for index, row in df.iterrows():
-            try:
-                # Calculate Revenue
-                quantity = row[qty_col]
-                if price_col and pd.notna(row[price_col]):
-                    revenue = quantity * row[price_col]
-                    source = "Price"
-                elif rev_col and pd.notna(row[rev_col]):
-                    revenue = row[rev_col]
-                    source = "Revenue"
-                else:
-                    revenue = 0.0
-                    source = "None"
-                
-                print(f"Row {index}: Quantity={quantity}, Revenue={revenue} (Source: {source})")
-            except Exception as e:
-                print(f"Error in row {index}: {e}")
-    else:
-        print("[FAIL] Required columns NOT found!")
-        missing = [key for key in required_keys if key not in col_map]
-        print(f"Missing: {missing}")
+# Clean start
+for f in os.listdir(UPLOAD_DIR):
+    os.remove(os.path.join(UPLOAD_DIR, f))
 
-print("--- Test Case 1: Lowercase 'price' ---")
-df1 = pd.DataFrame({
-    'date': ['2023-01-01'],
-    'product': ['Widget A'],
-    'quantity': [10],
-    'price': [5.0]
-})
-test_logic(df1)
+# Scenario 1: First Upload
+filename = "data.xlsx"
+timestamp1 = int(time.time())
+saved_name1 = f"{timestamp1}_{filename}"
+with open(os.path.join(UPLOAD_DIR, saved_name1), 'w') as f:
+    f.write("content 1")
+print(f"Created initial file: {saved_name1}")
 
-print("\n--- Test Case 2: Mixed case 'ReVeNuE' ---")
-df2 = pd.DataFrame({
-    'Date': ['2023-01-02'],
-    'Product': ['Widget B'],
-    'Quantity': [5],
-    'ReVeNuE': [100.0]
-})
-test_logic(df2)
+# Verify it exists
+files = os.listdir(UPLOAD_DIR)
+assert len(files) == 1
+assert saved_name1 in files
 
-print("\n--- Test Case 3: Missing columns ---")
-df3 = pd.DataFrame({
-    'Date': ['2023-01-03'],
-    'Qty': [5] 
-})
-test_logic(df3)
+# Scenario 2: Second Upload (Duplicate)
+print("Simulating second upload...")
+new_filename = "data.xlsx" # Same name
+# Logic under test
+existing_files = os.listdir(UPLOAD_DIR)
+for existing_file in existing_files:
+    try:
+        parts = existing_file.split('_', 1)
+        if len(parts) > 1:
+            stored_filename = parts[1]
+            if stored_filename == new_filename:
+                print(f"Found duplicate: {existing_file}. Removing...")
+                os.remove(os.path.join(UPLOAD_DIR, existing_file))
+    except Exception:
+        continue
+
+timestamp2 = int(time.time()) + 10 # ensure diff timestamp
+saved_name2 = f"{timestamp2}_{new_filename}"
+with open(os.path.join(UPLOAD_DIR, saved_name2), 'w') as f:
+    f.write("content 2")
+
+# Verify result
+files = os.listdir(UPLOAD_DIR)
+print(f"Final files: {files}")
+
+assert len(files) == 1, f"Expected 1 file, found {len(files)}"
+assert saved_name2 in files
+assert saved_name1 not in files
+print("SUCCESS: Duplicate removed, new file kept.")
+
+# Cleanup
+for f in os.listdir(UPLOAD_DIR):
+    os.remove(os.path.join(UPLOAD_DIR, f))
+os.rmdir(UPLOAD_DIR)
