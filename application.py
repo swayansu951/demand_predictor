@@ -745,8 +745,24 @@ elif page == "📂 Upload Data":
                 if not os.path.exists(active_upload_dir):
                     os.makedirs(active_upload_dir)
                 
-                timestamp = int(time.time())
+                # Check for duplicates and remove old version
                 original_filename = uploaded_file.name
+                existing_files = os.listdir(active_upload_dir)
+                
+                for existing_file in existing_files:
+                    try:
+                        # Extract original filename from stored filename (format: timestamp_filename)
+                        parts = existing_file.split('_', 1)
+                        if len(parts) > 1:
+                            stored_filename = parts[1]
+                            if stored_filename == original_filename:
+                                # Found duplicate, remove it
+                                os.remove(os.path.join(active_upload_dir, existing_file))
+                                # st.info(f"Replaced existing version of {original_filename}")
+                    except Exception:
+                        continue
+
+                timestamp = int(time.time())
                 saved_filename = f"{timestamp}_{original_filename}"
                 file_path = os.path.join(active_upload_dir, saved_filename)
                 
