@@ -76,61 +76,44 @@ def init_db(db_path):
     conn.close()
 
 # --- Sidebar & User/Project Selection ---
-st.sidebar.title("📈 ShopPulse")
+# --- Authentication & Session Management ---
+import auth
 
-# User Selection
-st.sidebar.subheader("👤 User")
-
-# Initialize session state for user
+# Initialize Session State
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
 if 'current_user' not in st.session_state:
-    users = get_users()
-    if not users:
-        # Create default user if none exist
-        create_user(DEFAULT_USER)
-        users = [DEFAULT_USER]
-    st.session_state.current_user = users[0]
+    st.session_state.current_user = None
 
-users = get_users()
+# Show Login/Signup if not authenticated
+if not st.session_state.authenticated:
+    st.title("🔐 ShopPulse Authentication")
+    
+    tab1, tab2 = st.tabs(["Sign In", "Sign Up"])
+    
+    with tab1:
+        auth.login_form()
+        
+    with tab2:
+        auth.signup_form()
+        
+    st.stop() # Stop execution here until logged in
 
-# User selection and creation UI
-col_user1, col_user2 = st.sidebar.columns([3, 1])
-with col_user1:
-    selected_user = st.selectbox("Select User", users, index=users.index(st.session_state.current_user) if st.session_state.current_user in users else 0, key="user_select")
-    if selected_user != st.session_state.current_user:
-        st.session_state.current_user = selected_user
-        st.rerun()
-
-with col_user2:
-    if st.button("➕", help="Create New User"):
-        st.session_state.show_new_user_dialog = True
-
-# New user creation dialog
-if st.session_state.get('show_new_user_dialog', False):
-    new_username = st.sidebar.text_input("New Username", placeholder="Enter username")
-    col_create1, col_create2 = st.sidebar.columns(2)
-    with col_create1:
-        if st.button("Create", type="primary", use_container_width=True):
-            if new_username.strip():
-                # Sanitize username
-                safe_username = "".join([c for c in new_username if c.isalnum() or c in ('_', '-')]).strip()
-                if safe_username and create_user(safe_username):
-                    st.session_state.current_user = safe_username
-                    st.session_state.show_new_user_dialog = False
-                    st.sidebar.success(f"User '{safe_username}' created!")
-                    time.sleep(0.5)
-                    st.rerun()
-                else:
-                    st.sidebar.error("User already exists or invalid name")
-            else:
-                st.sidebar.error("Please enter a username")
-    with col_create2:
-        if st.button("Cancel", use_container_width=True):
-            st.session_state.show_new_user_dialog = False
-            st.rerun()
-
+# --- Authenticated User Workspace ---
 # Initialize current user workspace
 init_user_workspace(st.session_state.current_user)
 user_dir = os.path.join(USERS_DIR, st.session_state.current_user)
+
+# --- Sidebar ---
+st.sidebar.title("📈 ShopPulse")
+st.sidebar.markdown(f"**Welcome, {st.session_state.current_user}!**")
+
+if st.sidebar.button("Logout", type="secondary"):
+    st.session_state.authenticated = False
+    st.session_state.current_user = None
+    st.rerun()
+
+st.sidebar.markdown("---")
 
 st.sidebar.markdown("---")
 
@@ -577,36 +560,59 @@ elif page == "📂 Upload Data":
                                     cursor.execute("DELETE FROM sales")
                                 
                                 # Insert data
-                                date_col = col_map['date']
-                                prod_col = col_map['product']
-                                qty_col = col_map['quantity']
-                                price_col = col_map.get('price')
-                                rev_col = col_map.get('revenue')
+                                # --- OPTIMIZED BULK LOAD ---
+                                # 1. Pre-process Data in Memory (Vectorized)
+                                df_load.rename(columns={
+                                    date_col: 'date',
+                                    prod_col: 'product_name',
+                                    qty_col: 'quantity'
+                                }, inplace=True)
                                 
-                                inserted_count = 0
-                                for index, row in df_load.iterrows():
-                                    try:
-                                        date_str = pd.to_datetime(row[date_col]).strftime('%Y-%m-%d')
-                                        quantity = row[qty_col]
-                                        if price_col and pd.notna(row[price_col]):
-                                            revenue = quantity * row[price_col]
-                                        elif rev_col and pd.notna(row[rev_col]):
-                                            revenue = row[rev_col]
-                                        else:
-                                            revenue = 0.0
-                                        
-                                        # prevent duplicates: delete existing record for same date/product
-                                        cursor.execute('DELETE FROM sales WHERE date = ? AND product_name = ?', (date_str, row[prod_col]))
-                                        
-                                        cursor.execute('''
-                                            INSERT INTO sales (date, product_name, quantity, revenue)
-                                            VALUES (?, ?, ?, ?)
-                                        ''', (date_str, row[prod_col], quantity, revenue))
-                                        inserted_count += 1
-                                    except Exception as e:
-                                        continue
-                                        
-                                conn.commit()
+                                # Format Date
+                                df_load['date'] = pd.to_datetime(df_load['date']).dt.strftime('%Y-%m-%d')
+                                
+                                # Calculate Revenue
+                                if price_col and price_col in df_load.columns:
+                                    df_load['revenue'] = df_load['quantity'] * df_load[price_col].fillna(0)
+                                elif rev_col and rev_col in df_load.columns:
+                                    df_load['revenue'] = df_load[rev_col].fillna(0)
+                                else:
+                                    df_load['revenue'] = 0.0
+                                    
+                                # Keep only necessary columns
+                                final_df = df_load[['date', 'product_name', 'quantity', 'revenue']].copy()
+                                
+                                # 2. Database Transaction
+                                inserted_count = len(final_df)
+                                try:
+                                    # Dump to temp table
+                                    final_df.to_sql('temp_sales_import', conn, if_exists='replace', index=False)
+                                    
+                                    # Bulk Delete (Deduplication)
+                                    # Remove rows from 'sales' that match (date, product) in temp table
+                                    cursor.execute('''
+                                        DELETE FROM sales 
+                                        WHERE EXISTS (
+                                            SELECT 1 FROM temp_sales_import 
+                                            WHERE sales.date = temp_sales_import.date 
+                                            AND sales.product_name = temp_sales_import.product_name
+                                        )
+                                    ''')
+                                    
+                                    # Bulk Insert
+                                    cursor.execute('''
+                                        INSERT INTO sales (date, product_name, quantity, revenue)
+                                        SELECT date, product_name, quantity, revenue FROM temp_sales_import
+                                    ''')
+                                    
+                                    # Cleanup
+                                    cursor.execute("DROP TABLE temp_sales_import")
+                                    conn.commit()
+                                except Exception as db_err:
+                                    conn.rollback()
+                                    raise db_err
+                                    
+                                conn.close()
                                 conn.close()
                                 st.success(f"✅ Successfully loaded {inserted_count} records from {file_to_load}!")
                                 time.sleep(1)
