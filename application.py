@@ -510,23 +510,183 @@ elif page == "🔮 Demand Prediction":
                     </div>
                     """, unsafe_allow_html=True)
 
-    else:
-        st.warning("Please upload data first.")
+# --- Helper Functions ---
+def process_excel_file(file_path, db_path, mode="Append"):
+    """
+    Reads an Excel file and efficiently loads it into the database using bulk operations.
+    Returns: (success_bool, message_string, count_int)
+    """
+    try:
+        conn = get_db_connection(db_path)
+        cursor = conn.cursor()
+        
+        df_load = pd.read_excel(file_path)
+        
+        # Validate columns
+        col_map = {str(col).lower().strip(): col for col in df_load.columns}
+        required_keys = ['date', 'product', 'quantity']
+        
+        if not all(key in col_map for key in required_keys):
+            conn.close()
+            return False, "❌ File missing required columns (Date, Product, Quantity).", 0
+
+        if mode == "Replace Database":
+            cursor.execute("DELETE FROM sales")
+        
+        # Insert data
+        date_col = col_map['date']
+        prod_col = col_map['product']
+        qty_col = col_map['quantity']
+        price_col = col_map.get('price')
+        rev_col = col_map.get('revenue')
+
+        # --- OPTIMIZED BULK LOAD ---
+        # 1. Pre-process Data in Memory (Vectorized)
+        df_load.rename(columns={
+            date_col: 'date',
+            prod_col: 'product_name',
+            qty_col: 'quantity'
+        }, inplace=True)
+        
+        # Format Date
+        df_load['date'] = pd.to_datetime(df_load['date']).dt.strftime('%Y-%m-%d')
+        
+        # Calculate Revenue
+        if price_col and price_col in df_load.columns:
+            df_load['revenue'] = df_load['quantity'] * df_load[price_col].fillna(0)
+        elif rev_col and rev_col in df_load.columns:
+            df_load['revenue'] = df_load[rev_col].fillna(0)
+        else:
+            df_load['revenue'] = 0.0
+            
+        # Keep only necessary columns
+        final_df = df_load[['date', 'product_name', 'quantity', 'revenue']].copy()
+        
+        # 2. Database Transaction
+        inserted_count = len(final_df)
+        try:
+            # Dump to temp table
+            final_df.to_sql('temp_sales_import', conn, if_exists='replace', index=False)
+            
+            # Bulk Delete (Deduplication)
+            # Remove rows from 'sales' that match (date, product) in temp table
+            cursor.execute('''
+                DELETE FROM sales 
+                WHERE EXISTS (
+                    SELECT 1 FROM temp_sales_import 
+                    WHERE sales.date = temp_sales_import.date 
+                    AND sales.product_name = temp_sales_import.product_name
+                )
+            ''')
+            
+            # Bulk Insert
+            cursor.execute('''
+                INSERT INTO sales (date, product_name, quantity, revenue)
+                SELECT date, product_name, quantity, revenue FROM temp_sales_import
+            ''')
+            
+            # Cleanup
+            cursor.execute("DROP TABLE temp_sales_import")
+            conn.commit()
+        except Exception as db_err:
+            conn.rollback()
+            raise db_err
+            
+        conn.close()
+        return True, f"✅ Successfully loaded {inserted_count} records!", inserted_count
+        
+    except Exception as e:
+        return False, f"Error processing file: {e}", 0
 
 # --- Upload Data Page ---
-elif page == "📂 Upload Data":
+if page == "📂 Upload Data":
     st.title("📂 Data Management")
     
     with st.container():
         st.markdown("""
         <div class='upload-box' style='padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
             <h3>Upload New Sales Records</h3>
-            <p>Upload your Excel file to update the database. Ensure columns: <b>Date, Product, Quantity</b>. Optional: <b>Price</b> (to auto-calculate Revenue).</p>
+            <p>DataFrame columns: <b>Date, Product, Quantity</b>. Optional: <b>Price</b>.</p>
         </div>
         """, unsafe_allow_html=True)
+
+        st.write("")
         
-        # Manage Data Section
-        with st.expander("🗑️ Manage Data"):
+        # --- NEW: Direct Upload Section ---
+        col_up1, col_up2 = st.columns([2, 1])
+        
+        with col_up1:
+            uploaded_file = st.file_uploader("Choose Excel File", type=["xlsx", "xls"])
+            
+        with col_up2:
+            st.write("<b>Settings</b>", unsafe_allow_html=True)
+            upload_destination = st.radio("Target", ["Current Project", "New Project"], horizontal=False, label_visibility="collapsed")
+            new_project_name = ""
+            if upload_destination == "New Project":
+                new_project_name = st.text_input("Project Name", placeholder="New Project Name")
+
+        if uploaded_file is not None:
+             if st.button("🚀 Save & Process Data", type="primary", use_container_width=True):
+                try:
+                    # 1. Determine Paths
+                    if upload_destination == "New Project" and new_project_name.strip():
+                        safe_project_name = "".join([c for c in new_project_name if c.isalnum() or c in (' ', '_', '-')]).strip()
+                        if not safe_project_name:
+                            st.error("Invalid project name.")
+                            st.stop()
+                        target_project_dir = os.path.join(user_projects_dir, safe_project_name)
+                        active_upload_dir = os.path.join(target_project_dir, "uploads")
+                        active_db_path = os.path.join(target_project_dir, "data.db")
+                        
+                        if not os.path.exists(active_upload_dir):
+                            os.makedirs(active_upload_dir)
+                        init_db(active_db_path)
+                        st.success(f"Created project: **{safe_project_name}**")
+                    else:
+                        active_upload_dir = current_upload_dir
+                        active_db_path = current_db_path
+
+                    # 2. Save File
+                    original_filename = uploaded_file.name
+                    
+                    # Deduplicate local file
+                    existing_files = os.listdir(active_upload_dir)
+                    for existing_file in existing_files:
+                        try:
+                            parts = existing_file.split('_', 1)
+                            if len(parts) > 1:
+                                stored_filename = parts[1]
+                                if stored_filename.lower() == original_filename.lower():
+                                    os.remove(os.path.join(active_upload_dir, existing_file))
+                        except Exception:
+                            continue
+
+                    timestamp = int(time.time())
+                    saved_filename = f"{timestamp}_{original_filename}"
+                    file_path = os.path.join(active_upload_dir, saved_filename)
+                    
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    st.info(f"File saved: {saved_filename}")
+
+                    # 3. Process & Load to DB
+                    success, msg, count = process_excel_file(file_path, active_db_path, mode="Append")
+                    
+                    if success:
+                        st.success(msg)
+                        time.sleep(1.5)
+                        st.rerun()
+                    else:
+                        st.error(msg)
+                        
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+        st.markdown("---")
+        
+        # Manage Data Section (Collapsed)
+        with st.expander("🗑️ Manage Saved Files & Database"):
             # --- File Management ---
             st.subheader("📂 Saved Files")
             
@@ -535,141 +695,38 @@ elif page == "📂 Upload Data":
             
             # --- Load Saved File ---
             if len(files) > 0:
-                st.markdown("### 📥 Load Saved File")
                 col_load1, col_load2 = st.columns([3, 1])
                 with col_load1:
-                    file_to_load = st.selectbox("Select a file to load into database", ["Select a file..."] + files)
+                    file_to_load = st.selectbox("Load existing file", ["Select..."] + files)
                 
-                if file_to_load != "Select a file...":
-                    load_mode = st.radio("Load Mode", ["Append to Database", "Replace Database"], horizontal=True)
+                if file_to_load != "Select...":
+                    load_mode = st.radio("Mode", ["Append to Database", "Replace Database"], horizontal=True)
                     
-                    if st.button("🚀 Load Data", type="primary"):
-                        try:
-                            file_path = os.path.join(current_upload_dir, file_to_load)
-                            df_load = pd.read_excel(file_path)
-                            
-                            # Validate columns
-                            col_map = {str(col).lower().strip(): col for col in df_load.columns}
-                            required_keys = ['date', 'product', 'quantity']
-                            
-                            if all(key in col_map for key in required_keys):
-                                conn = get_db_connection(current_db_path)
-                                cursor = conn.cursor()
-                                
-                                if load_mode == "Replace Database":
-                                    cursor.execute("DELETE FROM sales")
-                                
-                                # Insert data
-                                # --- OPTIMIZED BULK LOAD ---
-                                # 1. Pre-process Data in Memory (Vectorized)
-                                df_load.rename(columns={
-                                    date_col: 'date',
-                                    prod_col: 'product_name',
-                                    qty_col: 'quantity'
-                                }, inplace=True)
-                                
-                                # Format Date
-                                df_load['date'] = pd.to_datetime(df_load['date']).dt.strftime('%Y-%m-%d')
-                                
-                                # Calculate Revenue
-                                if price_col and price_col in df_load.columns:
-                                    df_load['revenue'] = df_load['quantity'] * df_load[price_col].fillna(0)
-                                elif rev_col and rev_col in df_load.columns:
-                                    df_load['revenue'] = df_load[rev_col].fillna(0)
-                                else:
-                                    df_load['revenue'] = 0.0
-                                    
-                                # Keep only necessary columns
-                                final_df = df_load[['date', 'product_name', 'quantity', 'revenue']].copy()
-                                
-                                # 2. Database Transaction
-                                inserted_count = len(final_df)
-                                try:
-                                    # Dump to temp table
-                                    final_df.to_sql('temp_sales_import', conn, if_exists='replace', index=False)
-                                    
-                                    # Bulk Delete (Deduplication)
-                                    # Remove rows from 'sales' that match (date, product) in temp table
-                                    cursor.execute('''
-                                        DELETE FROM sales 
-                                        WHERE EXISTS (
-                                            SELECT 1 FROM temp_sales_import 
-                                            WHERE sales.date = temp_sales_import.date 
-                                            AND sales.product_name = temp_sales_import.product_name
-                                        )
-                                    ''')
-                                    
-                                    # Bulk Insert
-                                    cursor.execute('''
-                                        INSERT INTO sales (date, product_name, quantity, revenue)
-                                        SELECT date, product_name, quantity, revenue FROM temp_sales_import
-                                    ''')
-                                    
-                                    # Cleanup
-                                    cursor.execute("DROP TABLE temp_sales_import")
-                                    conn.commit()
-                                except Exception as db_err:
-                                    conn.rollback()
-                                    raise db_err
-                                    
-                                conn.close()
-                                conn.close()
-                                st.success(f"✅ Successfully loaded {inserted_count} records from {file_to_load}!")
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.error("❌ File missing required columns (Date, Product, Quantity).")
-                        except Exception as e:
-                            st.error(f"Error loading file: {e}")
+                    if st.button("Re-Load Data", type="primary"):
+                        file_path = os.path.join(current_upload_dir, file_to_load)
+                        success, msg, count = process_excel_file(file_path, current_db_path, mode=load_mode)
+                        if success:
+                            st.success(msg)
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error(msg)
             
             st.markdown("---")
             
             # --- Delete Files ---
             if len(files) > 0:
-                st.subheader("🗑️ Delete Files")
                 files_to_delete = st.multiselect("Select files to delete", files)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("🗑️ Delete Selected", type="primary", use_container_width=True):
-                        if files_to_delete:
-                            deleted_count = 0
-                            for f in files_to_delete:
-                                try:
-                                    os.remove(os.path.join(current_upload_dir, f))
-                                    deleted_count += 1
-                                except Exception as e:
-                                    st.error(f"Error deleting {f}: {e}")
-                            
-                            if deleted_count > 0:
-                                st.success(f"Deleted {deleted_count} files.")
-                                time.sleep(0.5)
-                                st.rerun()
-                        else:
-                            st.warning("Please select files to delete.")
-                            
-                with col2:
-                    if st.button("⚠️ Clear All Files", type="secondary", use_container_width=True):
-                        deleted_count = 0
-                        for f in files:
-                            try:
-                                os.remove(os.path.join(current_upload_dir, f))
-                                deleted_count += 1
-                            except Exception as e:
-                                st.error(f"Error deleting {f}: {e}")
-                        
-                        if deleted_count > 0:
-                            st.success(f"Deleted {deleted_count} files.")
-                            time.sleep(0.5)
-                            st.rerun()
-            else:
-                st.info("No files to clear.")
+                if st.button("🗑️ Delete Selected"):
+                     for f in files_to_delete:
+                        try:
+                            os.remove(os.path.join(current_upload_dir, f))
+                        except: pass
+                     st.rerun()
 
             st.markdown("---")
 
             # --- Database Management ---
-            st.subheader("🗄️ Database Records")
-            
             conn = get_db_connection(current_db_path)
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM sales")
@@ -680,108 +737,11 @@ elif page == "📂 Upload Data":
             
             if count > 0:
                 if st.button("Clear All Database Records", type="primary"):
-                    try:
-                        conn = get_db_connection(current_db_path)
-                        cursor = conn.cursor()
-                        cursor.execute("DELETE FROM sales")
-                        conn.commit()
-                        conn.close()
-                        st.success("✅ All database records deleted successfully!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error clearing database: {e}")
-            else:
-                st.info("Database is empty.")
+                    conn = get_db_connection(current_db_path)
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM sales")
+                    conn.commit()
+                    conn.close()
+                    st.success("Cleared.")
+                    st.rerun()
 
-            st.markdown("---")
-            
-            # --- Hard Reset ---
-            st.subheader("⚠️ Danger Zone")
-            if st.button("🧨 Delete Database File (Hard Reset)", type="primary"):
-                try:
-                    if os.path.exists(current_db_path):
-                        os.remove(current_db_path)
-                        st.success("✅ Database file deleted successfully! App will reload...")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.warning("Database file not found.")
-                except Exception as e:
-                    st.error(f"Error deleting database file: {e}")
-
-        st.write("") # Spacer
-        
-        # --- Upload Section ---
-        st.subheader("📤 Upload New Data")
-        
-        upload_destination = st.radio("Destination", ["Current Project", "New Project"], horizontal=True)
-        
-        new_project_name = ""
-        if upload_destination == "New Project":
-            new_project_name = st.text_input("Project Name", placeholder="Enter name for new workspace")
-        
-        uploaded_file = st.file_uploader("Drop your Excel file here", type=["xlsx", "xls"])
-
-        if uploaded_file is not None:
-            try:
-                # Determine target paths
-                if upload_destination == "New Project" and new_project_name.strip():
-                    # Sanitize project name
-                    safe_project_name = "".join([c for c in new_project_name if c.isalnum() or c in (' ', '_', '-')]).strip()
-                    if not safe_project_name:
-                        st.error("Invalid project name.")
-                        st.stop()
-                        
-                    # Create project in current user's projects directory
-                    target_project_dir = os.path.join(user_projects_dir, safe_project_name)
-                    target_upload_dir = os.path.join(target_project_dir, "uploads")
-                    target_db_path = os.path.join(target_project_dir, "data.db")
-                    
-                    if not os.path.exists(target_upload_dir):
-                        os.makedirs(target_upload_dir)
-                    
-                    # Initialize DB for new project
-                    init_db(target_db_path)
-                    
-                    st.success(f"Creating new project: **{safe_project_name}**")
-                    active_upload_dir = target_upload_dir
-                    active_db_path = target_db_path
-                else:
-                    active_upload_dir = current_upload_dir
-                    active_db_path = current_db_path
-
-                # Save the file to disk
-                if not os.path.exists(active_upload_dir):
-                    os.makedirs(active_upload_dir)
-                
-                # Check for duplicates and remove old version
-                original_filename = uploaded_file.name
-                existing_files = os.listdir(active_upload_dir)
-                
-                for existing_file in existing_files:
-                    try:
-                        # Extract original filename from stored filename (format: timestamp_filename)
-                        parts = existing_file.split('_', 1)
-                        if len(parts) > 1:
-                            stored_filename = parts[1]
-                            if stored_filename.lower() == original_filename.lower():
-                                # Found duplicate, remove it
-                                os.remove(os.path.join(active_upload_dir, existing_file))
-                                # st.info(f"Replaced existing version of {original_filename}")
-                    except Exception:
-                        continue
-
-                timestamp = int(time.time())
-                saved_filename = f"{timestamp}_{original_filename}"
-                file_path = os.path.join(active_upload_dir, saved_filename)
-                
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                
-                st.success(f"File saved locally as: {saved_filename}")
-                
-                # Refresh to show the new file in the list
-                time.sleep(1)
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
