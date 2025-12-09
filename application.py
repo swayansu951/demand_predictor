@@ -758,7 +758,7 @@ elif page == "📂 Upload Data":
                         parts = existing_file.split('_', 1)
                         if len(parts) > 1:
                             stored_filename = parts[1]
-                            if stored_filename == original_filename:
+                            if stored_filename.lower() == original_filename.lower():
                                 # Found duplicate, remove it
                                 os.remove(os.path.join(active_upload_dir, existing_file))
                                 # st.info(f"Replaced existing version of {original_filename}")
