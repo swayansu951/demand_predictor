@@ -595,6 +595,9 @@ elif page == "📂 Upload Data":
                                         else:
                                             revenue = 0.0
                                         
+                                        # prevent duplicates: delete existing record for same date/product
+                                        cursor.execute('DELETE FROM sales WHERE date = ? AND product_name = ?', (date_str, row[prod_col]))
+                                        
                                         cursor.execute('''
                                             INSERT INTO sales (date, product_name, quantity, revenue)
                                             VALUES (?, ?, ?, ?)
