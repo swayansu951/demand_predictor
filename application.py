@@ -4,12 +4,10 @@ import sqlite3
 import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import r2_score, mean_absolute_percentage_error
 import numpy as np
 from datetime import datetime, timedelta
 import os
 import time
-import extra_streamlit_components as stx
 
 # --- Constants & Setup ---
 USERS_DIR = "users"
@@ -32,10 +30,9 @@ def create_user(username):
         return False
     
     # Create user directories
-    # Create user directories
-    os.makedirs(user_dir, exist_ok=True)
-    os.makedirs(os.path.join(user_dir, "projects"), exist_ok=True)
-    os.makedirs(os.path.join(user_dir, "uploaded_files"), exist_ok=True)
+    os.makedirs(user_dir)
+    os.makedirs(os.path.join(user_dir, "projects"))
+    os.makedirs(os.path.join(user_dir, "uploaded_files"))
     
     # Initialize empty database
     user_db = os.path.join(user_dir, "data.db")
@@ -88,12 +85,6 @@ if 'authenticated' not in st.session_state:
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 
-# Initialize Cookie Manager
-cookie_manager = stx.CookieManager()
-
-# Try Auto Login
-auth.auto_login(cookie_manager)
-
 # Show Login/Signup if not authenticated
 if not st.session_state.authenticated:
     st.title("🔐 ShopPulse Authentication")
@@ -101,7 +92,7 @@ if not st.session_state.authenticated:
     tab1, tab2 = st.tabs(["Sign In", "Sign Up"])
     
     with tab1:
-        auth.login_form(cookie_manager)
+        auth.login_form()
         
     with tab2:
         auth.signup_form()
@@ -118,7 +109,9 @@ st.sidebar.title("📈 ShopPulse")
 st.sidebar.markdown(f"**Welcome, {st.session_state.current_user}!**")
 
 if st.sidebar.button("Logout", type="secondary"):
-    auth.logout(cookie_manager)
+    st.session_state.authenticated = False
+    st.session_state.current_user = None
+    st.rerun()
 
 st.sidebar.markdown("---")
 
@@ -443,15 +436,6 @@ elif page == "🔮 Demand Prediction":
                     
                     model = LinearRegression()
                     model.fit(X, y)
-
-                    # Calculate Training Accuracy (Goodness of Fit)
-                    y_pred_train = model.predict(X)
-                    r2_train = r2_score(y, y_pred_train)
-                    try:
-                        mape_train = mean_absolute_percentage_error(y, y_pred_train)
-                    except:
-                        mape_train = 0.0
-                    acc_train = max(0, (1 - mape_train) * 100)
                     
                     # Predict next N days
                     last_date = product_data['date'].max()
@@ -500,7 +484,7 @@ elif page == "🔮 Demand Prediction":
                     i1, i2, i3 = st.columns(3)
                     i1.metric("Predicted Avg Daily Demand", f"{avg_predicted:.1f} units")
                     i2.metric("Expected Growth", f"{growth:+.1f}%", delta_color="normal")
-                    i3.metric("Model Confidence", f"{acc_train:.1f}%", help=f"Historical Accuracy based on R2: {r2_train:.2f}")
+                    i3.metric("Recommended Stock", f"{sum(future_predictions):.0f} units", help=f"Total units needed for next {forecast_days} days")
                     
                     st.markdown("### 🤖 Suggestion")
                     if growth > 20:
@@ -760,4 +744,3 @@ if page == "📂 Upload Data":
                     conn.close()
                     st.success("Cleared.")
                     st.rerun()
-
